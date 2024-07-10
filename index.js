@@ -186,8 +186,7 @@ const generateListCommits = async (diff, numOptions = 5) => {
   for await (const part of result.textStream) {
     text += part;
   }
-  let msgs = text.split("\n").map((msg) => msg.trim());
-  msgs = msgs.slice(1, -1);
+  let msgs = text.split(";").map((msg) => msg.trim());
   if (template) {
     msgs = msgs.map((msg) =>
       processTemplate({
