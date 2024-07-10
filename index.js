@@ -90,25 +90,31 @@ const sendMessage = async (input) => {
  * @returns {string} - The generated prompt.
  */
 const generatePrompt = (diff, numOptions) => {
-  const basePrompt =
-    "I want you to act as the author of a commit message in git. " +
-    `I'll enter a git diff, and your job is to convert it into a useful commit message in ${language} language` +
-    (commitType ? ` with commit type '${commitType}'. ` : ". ");
+  const basePrompt = `
+  Generate ${
+    numOptions && `${numOptions} options separated by';' of`
+  } a short formatted 1-line commit message following the pattern '<commit type>': msg' based on the changes staged for commit:
+  1. The commit message should be in ${language}.
+  2. The type of commit ${
+    commitType ? commitType : "('feat', 'fix', 'add', etc.)"
+  }.
+  `;
 
   if (numOptions) {
-    return (
-      basePrompt +
-      (commitType ? ` with commit type '${commitType}.', ` : ", ") +
-      `and make ${numOptions} options that are separated by ';'. ` +
-      "For each option, use the present tense, return the full sentence, and use the conventional commits specification (<type in lowercase>: <subject>): " +
-      diff
-    );
+    basePrompt +
+      `
+    3. Make ${numOptions} options separated by ';'. 
+      `;
   }
 
   return (
     basePrompt +
-    "Do not preface the commit with anything, use the present tense, return the full sentence, and use the conventional commits specification (<type in lowercase>: <subject>): " +
-    diff
+    `
+    ---
+    Staged Changes:
+    ${diff}
+    ---
+    `
   );
 };
 
@@ -180,8 +186,8 @@ const generateListCommits = async (diff, numOptions = 5) => {
   for await (const part of result.textStream) {
     text += part;
   }
-  let msgs = text.split(";").map((msg) => msg.trim());
-
+  let msgs = text.split("\n").map((msg) => msg.trim());
+  msgs = msgs.slice(1, -1);
   if (template) {
     msgs = msgs.map((msg) =>
       processTemplate({
