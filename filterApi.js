@@ -1,14 +1,21 @@
 import inquirer from "inquirer";
 
-const MAX_TOKENS = 4000; // Establece el máximo de tokens permitidos para Google AI.
+const MAX_TOKENS = 1048576; // Maximum number of tokens allowed for Google AI.
 
+/**
+ * Filters the prompt based on the number of tokens.
+ * @param {Object} options - Options for the API.
+ * @param {string} options.prompt - The prompt to be evaluated.
+ * @returns {boolean} - True if the prompt passes the verification, false otherwise.
+ */
 async function filterApi({ prompt }) {
-  const numTokens = getNumTokens(prompt); // Todo: Calcula la longitud en tokens del prompt codificado según Google AI.
+  const numTokens = calculateNumTokens(prompt);
 
   if (numTokens > MAX_TOKENS) {
     console.log(
       `The commit diff is too large for the Google AI API. Max ${MAX_TOKENS} tokens.`
     );
+
     const answer = await inquirer.prompt([
       {
         type: "confirm",
@@ -17,18 +24,22 @@ async function filterApi({ prompt }) {
         default: true,
       },
     ]);
-    if (!answer.continue) return false; // Si el usuario no responde 'yes', devuelve falso.
-    return true; // Si el usuario responde 'yes', devuelve verdadero.
+
+    return answer.continue; // Returns the user's response.
   }
 
-  return true; // Si pasa todas las verificaciones, devuelve verdadero.
+  return true; // The prompt is within the allowed token limit.
 }
 
-function getNumTokens(prompt) {
-  // Implementa una lógica para calcular la cantidad de tokens del prompt.
-  // Esto puede variar según cómo se estructura el prompt y cómo lo analiza el modelo.
-  // Puedes usar métodos de manipulación de cadenas o técnicas de conteo de tokens aquí.
-  return prompt.split(" ").length; // Ejemplo simple: cuenta los tokens dividiendo por espacios.
+/**
+ * Calculates the number of tokens in a prompt.
+ * @param {string} prompt - The prompt to be evaluated.
+ * @returns {number} - The number of tokens.
+ */
+function calculateNumTokens(prompt) {
+  // TODO: Implement logic to calculate the number of tokens in the prompt.
+  // Currently, counts the words separated by spaces.
+  return prompt.split(" ").length;
 }
 
 export { filterApi };

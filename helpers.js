@@ -1,13 +1,9 @@
 import { execSync } from "child_process";
 
-// ArgsTypes
-// apiKey?: string; // Ex: --apiKey MY_API_KEY
-// language?: string; // Ex: --language spanish
-// template?: string; // Ex: --template "Modified {GIT_BRANCH} | {COMMIT_MESSAGE}"
-// "commit-type"?: string; // Ex: --commit-type feat
-// list?: string; // Ex: --list
-// force?: string; // Ex: --force
-
+/**
+ * Retrieves command line arguments.
+ * @returns {Object} - An object with arguments and their values.
+ */
 const getArgs = () => {
   const args = process.argv.slice(2);
   const result = {};
@@ -16,6 +12,7 @@ const getArgs = () => {
     const arg = args[i];
     const key = arg.replace(/^--/, "");
     const nextArg = args[i + 1];
+
     if (/^--/.test(nextArg) || nextArg === undefined) {
       result[key] = true;
     } else {
@@ -27,6 +24,10 @@ const getArgs = () => {
   return result;
 };
 
+/**
+ * Checks if the current directory is a Git repository.
+ * @returns {boolean} - True if the directory is a Git repository, false otherwise.
+ */
 const checkGitRepository = () => {
   try {
     const output = execSync("git rev-parse --is-inside-work-tree", {

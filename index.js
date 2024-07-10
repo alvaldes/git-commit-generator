@@ -12,7 +12,6 @@ import { streamText } from "ai";
 const REGENERATE_MSG = "♻️ Regenerate Commit Messages";
 
 const apiKey = args.apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-
 const language = args.language || process.env.AI_COMMIT_LANGUAGE || "english";
 
 if (!apiKey) {
@@ -23,13 +22,18 @@ if (!apiKey) {
 }
 
 let template = args.template || process.env.AI_COMMIT_COMMIT_TEMPLATE;
-
 const commitType = args["commit-type"];
 
+/**
+ * Processes the commit message template.
+ * @param {Object} options - Options for the template.
+ * @param {string} options.template - The template to use.
+ * @param {string} options.commitMessage - The commit message.
+ * @returns {string} - The processed commit message.
+ */
 const processTemplate = ({ template, commitMessage }) => {
   if (!template.includes("COMMIT_MESSAGE")) {
     console.log(`Warning: template doesn't include {COMMIT_MESSAGE}`);
-
     return commitMessage;
   }
 
@@ -54,6 +58,10 @@ const processTemplate = ({ template, commitMessage }) => {
   return finalCommitMessage;
 };
 
+/**
+ * Creates a commit with the given message.
+ * @param {string} input - The commit message.
+ */
 const makeCommit = (input) => {
   console.log("Committing Message... 🚀 ");
   execSync(`git commit -F -`, { input: input[0] });
@@ -61,50 +69,67 @@ const makeCommit = (input) => {
 };
 
 /**
- * send prompt to ai.
+ * Sends the prompt to the AI model.
+ * @param {string} input - The input prompt.
+ * @returns {Promise<string>} - The AI response.
  */
 const sendMessage = async (input) => {
-  console.log("prompting google-ai...");
+  console.log("Prompting Google AI...");
   const result = await streamText({
     model: google("models/gemini-1.5-flash-latest"),
     prompt: input,
   });
-  console.log("prompting ai done!");
+  console.log("Prompting AI done!");
   return result;
 };
 
-const getPromptForSingleCommit = (diff) => {
-  return (
-    "I want you to act as the author of a commit message in git." +
+/**
+ * Generates the prompt for a commit.
+ * @param {string} diff - The git diff.
+ * @param {number} [numOptions] - Number of options for list commits.
+ * @returns {string} - The generated prompt.
+ */
+const generatePrompt = (diff, numOptions) => {
+  const basePrompt =
+    "I want you to act as the author of a commit message in git. " +
     `I'll enter a git diff, and your job is to convert it into a useful commit message in ${language} language` +
-    (commitType ? ` with commit type '${commitType}'. ` : ". ") +
+    (commitType ? ` with commit type '${commitType}'. ` : ". ");
+
+  if (numOptions) {
+    return (
+      basePrompt +
+      (commitType ? ` with commit type '${commitType}.', ` : ", ") +
+      `and make ${numOptions} options that are separated by ';'. ` +
+      "For each option, use the present tense, return the full sentence, and use the conventional commits specification (<type in lowercase>: <subject>): " +
+      diff
+    );
+  }
+
+  return (
+    basePrompt +
     "Do not preface the commit with anything, use the present tense, return the full sentence, and use the conventional commits specification (<type in lowercase>: <subject>): " +
     diff
   );
-  //for less smart models, give simpler instruction.
-  //   return (
-  //     "Summarize this git diff into a useful, 10 words commit message" +
-  //     (commitType ? ` with commit type '${commitType}.'` : "") +
-  //     ": " +
-  //     diff
-  //   );
 };
 
+/**
+ * Generates a single commit message.
+ * @param {string} diff - The git diff.
+ */
 const generateSingleCommit = async (diff) => {
-  const prompt = getPromptForSingleCommit(diff);
-
+  const prompt = generatePrompt(diff);
   if (!(await filterApi({ prompt }))) process.exit(1);
 
   let resp = await sendMessage(prompt);
   let text = "";
   for await (const part of resp.textStream) {
-    text += part; // vamos guardando el resultado en el array
+    text += part;
   }
   let finalCommitMessage = text.split(";").map((msg) => msg.trim());
 
-  if (args.template) {
+  if (template) {
     finalCommitMessage = processTemplate({
-      template: args.template,
+      template,
       commitMessage: finalCommitMessage,
     });
 
@@ -139,40 +164,34 @@ const generateSingleCommit = async (diff) => {
   makeCommit(finalCommitMessage);
 };
 
+/**
+ * Generates multiple commit message options.
+ * @param {string} diff - The git diff.
+ * @param {number} [numOptions=5] - Number of commit message options.
+ */
 const generateListCommits = async (diff, numOptions = 5) => {
-  const prompt =
-    "I want you to act as the author of a commit message in git." +
-    `I'll enter a git diff, and your job is to convert it into a useful commit message in ${language} language` +
-    (commitType ? ` with commit type '${commitType}.', ` : ", ") +
-    `and make ${numOptions} options that are separated by ";".` +
-    "For each option, use the present tense, return the full sentence, and use the conventional commits specification (<type in lowercase>: <subject>):" +
-    diff;
+  const prompt = generatePrompt(diff, numOptions);
 
-  if (
-    !(await filterApi({
-      prompt,
-    }))
-  )
-    process.exit(1);
+  if (!(await filterApi({ prompt }))) process.exit(1);
 
   const result = await sendMessage(prompt);
   let text = "";
 
   for await (const part of result.textStream) {
-    text += part; // vamos guardando el resultado en el array
+    text += part;
   }
   let msgs = text.split(";").map((msg) => msg.trim());
 
-  if (args.template) {
+  if (template) {
     msgs = msgs.map((msg) =>
       processTemplate({
-        template: args.template,
+        template,
         commitMessage: msg,
       })
     );
   }
 
-  // add regenerate option
+  // Add regenerate option
   msgs.push(REGENERATE_MSG);
 
   const answer = await inquirer.prompt([
@@ -185,13 +204,16 @@ const generateListCommits = async (diff, numOptions = 5) => {
   ]);
 
   if (answer.commit === REGENERATE_MSG) {
-    await generateListCommits(diff);
+    await generateListCommits(diff, numOptions);
     return;
   }
 
   makeCommit(answer.commit);
 };
 
+/**
+ * Main function to generate AI commit messages.
+ */
 async function generateAICommit() {
   const isGitRepository = checkGitRepository();
 
@@ -206,7 +228,7 @@ async function generateAICommit() {
   if (!diff) {
     console.log("No changes to commit 🙅");
     console.log(
-      "May be you forgot to add the files? Try git add . and then run this script again."
+      "Maybe you forgot to add the files? Try git add . and then run this script again."
     );
     process.exit(1);
   }
