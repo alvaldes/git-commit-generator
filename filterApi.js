@@ -11,26 +11,14 @@ async function filterApi({ prompt }) {
     );
     const answer = await inquirer.prompt([
       {
-        type: "input",
-        name: "confirm",
-        message: `Do you want to continue with ${MAX_TOKENS} tokens? (yes/no)`,
-        validate: function (input) {
-          const normalizedInput = input.trim().toLowerCase();
-          if (
-            normalizedInput === "yes" ||
-            normalizedInput === "y" ||
-            normalizedInput === "no" ||
-            normalizedInput === "n"
-          ) {
-            return true;
-          } else {
-            return "Please enter 'yes' or 'no'.";
-          }
-        },
+        type: "confirm",
+        name: "continue",
+        message: `Do you want to continue with ${MAX_TOKENS} tokens?`,
+        default: true,
       },
     ]);
-
-    if (answer.confirm.toLowerCase() !== "yes") return false; // Si el usuario no responde 'yes', devuelve falso.
+    if (!answer.continue) return false; // Si el usuario no responde 'yes', devuelve falso.
+    return true; // Si el usuario responde 'yes', devuelve verdadero.
   }
 
   return true; // Si pasa todas las verificaciones, devuelve verdadero.
